@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turnier-Aufgaben eintragen</title>
+<style>
+/* Layout: eine ruhige Spalte, pro Rolle eine Karte mit Zähler, Kürzeln und Eintragsfeld */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #17202e;
+  --muted: #566274;
+  --accent: #1d4f91;
+  --accent-ink: #ffffff;
+  --line: #d8dee8;
+  --free-bg: #fff1dc;
+  --free-ink: #8a4300;
+  --done-bg: #e3f3ea;
+  --done-ink: #17653c;
+  --warn-bg: #fde7e7;
+  --warn-ink: #8f1d1d;
+  --font: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1520; --surface: #182130; --ink: #e8edf5; --muted: #9aa8bc;
+    --accent: #7db0f0; --accent-ink: #0d1520; --line: #2b3749;
+    --free-bg: #3a2a12; --free-ink: #ffbf70; --done-bg: #14301f; --done-ink: #86d9a6;
+    --warn-bg: #3d1b1b; --warn-ink: #ffb3b3;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.5; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 1.7rem; line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-size: 1.2rem; margin: 0; }
+h3 { font-size: 1.05rem; margin: 0; }
+.eyebrow { color: var(--muted); font-size: 0.95rem; margin: 0 0 4px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.count { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.count strong { font-size: 1.6rem; }
+.bar { height: 10px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.hint { margin: 0; color: var(--muted); font-size: 0.97rem; max-width: 65ch; }
+.status { font-size: 0.9rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.status.ok { color: var(--done-ink); background: var(--done-bg); border-color: transparent; }
+.status.off { color: var(--free-ink); background: var(--free-bg); border-color: transparent; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 14px; min-height: 40px; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+button.link { border: none; background: none; color: var(--accent); padding: 6px 8px; min-height: 36px; text-decoration: underline; }
+button.danger { color: var(--warn-ink); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+label.check { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+label.check input { width: 20px; height: 20px; }
+.notice { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; font-weight: 700; }
+.notice[hidden] { display: none; }
+.notice button { flex: none; color: inherit; border-color: currentColor; background: transparent; }
+.mine { display: flex; flex-direction: column; gap: 6px; }
+.mine ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.gh { margin: 8px 0 -8px; color: var(--muted); font-size: 0.95rem; font-weight: 700; }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.role.hidden { display: none; }
+.role-top { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: baseline; }
+.role-top span.sub { color: var(--muted); font-size: 0.95rem; }
+.pill { font-size: 0.88rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.pill.free { background: var(--free-bg); color: var(--free-ink); }
+.pill.done { background: var(--done-bg); color: var(--done-ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px; font-weight: 700; letter-spacing: 0.04em; background: var(--bg); }
+.chip.me { border-color: var(--accent); }
+.chip button { min-height: 28px; padding: 0 6px; border: none; background: none; color: var(--warn-ink); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.edit { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.edit input { flex: 0 1 160px; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); min-height: 42px; letter-spacing: 0.08em; text-transform: uppercase; }
+details.more summary { cursor: pointer; color: var(--accent); font-weight: 700; padding: 4px 0; }
+details.more ul { margin: 6px 0 4px; padding-left: 20px; max-width: 65ch; }
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); max-width: 460px; width: calc(100% - 32px); padding: 20px; font: inherit; }
+dialog::backdrop { background: rgba(10, 16, 26, .55); }
+dialog p { margin: 0 0 16px; }
+dialog textarea { width: 100%; min-height: 220px; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); margin-bottom: 12px; }
+.dlg-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.linkbox { display: flex; flex-direction: column; gap: 6px; }
+.linkbox code { display: block; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; font-size: 0.9rem; }
+.hidden { display: none; }
+@media (max-width: 560px) { h1 { font-size: 1.45rem; } }
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<dialog id="dlg">
+  <p id="dlg-text"></p>
+  <div class="dlg-actions">
+    <button type="button" id="dlg-cancel">Abbrechen</button>
+    <button type="button" class="primary" id="dlg-ok">OK</button>
+  </div>
+</dialog>
+<dialog id="copydlg">
+  <p id="copy-intro">Markiere den Text und kopiere ihn.</p>
+  <textarea id="copytext" readonly></textarea>
+  <div class="dlg-actions"><button type="button" class="primary" id="copyclose">Schließen</button></div>
+</dialog>
+<input type="file" id="fileIn" accept=".json,application/json" class="hidden">
+
+<script>
+/* ---------- Einstellungen ---------- */
+const SERVER = "https://ntfy.sh";   // bei eigenem ntfy-Server hier ändern
+const TITLE = "Sparkasse Göttingen-Basketball Grundschulliga";
+
+/* ---------- Rollen (Summe der Plätze: 26) ---------- */
+const ROLES = [
+  { id: "feld1", group: "Schiedsgericht", title: "Schiedsgericht Feld 1", sub: "Schiri, Kampfgericht, Pause im Wechsel", cap: 4,
+    details: ["Zwei Schiris pfeifen das Spiel und achten auf Fairness und Regeln.", "Das Kampfgericht trägt den Spielstand auf dem Tablet ein und bestätigt das Ergebnis.", "Wer Pause hat, trinkt, schaut zu und löst bei Bedarf ab.", "Nach jedem Spiel rückt jede Person eine Position weiter: Schiri 1, Schiri 2, Kampfgericht, Pause. Wer von Schiri 1 zu Schiri 2 wechselt, pfeift zwei Spiele hintereinander. Danach folgen Kampfgericht und Pause, mehr als zwei Spiele in Folge pfeift also niemand.", "Bei Grundschulkindern gilt: großzügig pfeifen, kurz erklären, nicht bestrafen."] },
+  { id: "feld2", group: "Schiedsgericht", title: "Schiedsgericht Feld 2", sub: "Schiri, Kampfgericht, Pause im Wechsel", cap: 4,
+    details: ["Aufgaben und Rotation sind gleich wie auf Feld 1.", "Die Rotationskarte liegt am Feld."] },
+  { id: "leitung", group: "Turnierleitung und Moderation", title: "Turnierleitung", sub: "Ablauf, Technik und Ergebnisse, zu zweit", cap: 2,
+    details: ["Behält den Zeitplan im Blick und gibt Rundenbeginn und Rundenende bekannt.", "Ist Ansprechperson für alle Teams und Helfer und klärt Streitfälle gemeinsam mit der Lehrkraft.", "Bedient Laptop, Spieluhr, Zuschauer-Bildschirm und Musik und prüft vor dem ersten Spiel Ton, Anzeige und Tablets.", "Prüft eingehende Ergebnisse, übernimmt sie in die Turnier-App und hält den Aushang mit Spielplan und Tabellen aktuell.", "Ihr seid zu zweit und teilt euch die Aufgaben selbst auf, zum Beispiel eine Person für Ablauf und Ansprechperson, eine für Technik und Ergebnisse."] },
+  { id: "sprecher", group: "Turnierleitung und Moderation", title: "Sprecher und Moderation", sub: "Ansagen und Siegerehrung", cap: 1,
+    details: ["Macht die Ansagen in der Halle: Rundenbeginn, Spielpaarungen, Hinweise an Zuschauer.", "Stellt die Mannschaften vor und kündigt Spielende und Pausen an.", "Moderiert die Siegerehrung.", "Spricht sich mit der Turnierleitung ab, was wann durchgesagt wird."] },
+  { id: "betreuung", group: "Mannschaftsbetreuung", title: "Mannschaftsbetreuung", sub: "Empfang und Ansprechperson, ein Team pro Person", cap: 10,
+    details: ["Empfang: Team begrüßen, Garderobe, Toiletten, Trinkstation und Felder zeigen, Spielplan und Mannschaftsplan übergeben, die Zeit des ersten Spiels nennen.", "Danach am Betreuertisch erreichbar bleiben für Fragen und kleine Sorgen der Kinder.", "Wenn dein Team nicht dran ist, kannst du nach Absprache mit der Turnierleitung aushelfen.", "Welches Team du betreust, klärt die Turnierleitung später."] },
+  { id: "medien", group: "Medienteam", title: "Medienteam", sub: "Fotos, Videos und kurze Interviews, zu zweit", cap: 2,
+    details: ["Sammelt Material für den späteren Bericht als Video und in anderer Form: Fotos, Videoclips und kurze Interviews.", "Fotografiert und filmt Spielaktionen, Jubel, Aufwärmen, Trösten, Schiris und die Siegerehrung.", "Führt kurze Interviews mit Kindern, Betreuung, Schiris und Lehrkräften, möglichst in einer ruhigen Ecke, mit drei bis vier einfachen Fragen.", "Nur Kinder mit Einwilligung zeigen. Wer nicht gezeigt werden darf, trägt ein Band oder einen Sticker.", "Legt die Dateien nach jedem Block im gemeinsamen Ordner ab und führt ein Protokoll mit Uhrzeit, Name oder Rolle und Thema.", "Ihr seid zu zweit und teilt euch Bild und Ton selbst auf."] },
+  { id: "springer", group: "Springer", title: "Springer", sub: "Auf- und Abbau, Material, Ersatz", cap: 3,
+    details: ["Hilft beim Auf- und Abbau der Felder, Tische und Aushänge.", "Verteilt Material wie Trinkflaschen, Leibchen und Bälle.", "Springt bei Ausfall in einer anderen Rolle ein.", "Eine der drei Personen ist zusätzlich erste Ansprechperson bei kleinen Verletzungen. Wer das übernimmt, klärt ihr mit der Lehrkraft."] }
+];
+const ROLE = Object.fromEntries(ROLES.map(r => [r.id, r]));
+const TOTAL = ROLES.reduce((s, r) => s + r.cap, 0);
+
+/* ==REPLAY== */
+// Spielt alle Nachrichten in fester Reihenfolge ab. Die Reihenfolge ist für alle Geräte gleich,
+// deshalb entscheiden alle gleich, wer den letzten freien Platz bekommen hat.
+function cleanKuerzel(v) { return String(v || "").replace(/[^A-Za-zÄÖÜäöü]/g, "").toUpperCase().slice(0, 3); }
+function validClaim(c) {
+  return c && typeof c.id === "string" && c.id.length >= 6 && c.id.length <= 40 &&
+    typeof c.r === "string" && ROLE[c.r] && cleanKuerzel(c.k).length >= 2 && cleanKuerzel(c.k) === c.k;
+}
+function replay(list) {
+  const sorted = list.slice().sort((a, b) => (a.time - b.time) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  let claims = [];
+  let seen = new Set();
+  let tomb = new Set();
+  const rejected = new Set();
+  const countOf = r => claims.filter(c => c.r === r).length;
+  for (const m of sorted) {
+    const ev = m.ev;
+    if (!ev || ev.v !== 1) continue;
+    if (ev.t === "c") {
+      if (!validClaim(ev) || seen.has(ev.id) || tomb.has(ev.id)) continue;
+      seen.add(ev.id);
+      if (countOf(ev.r) >= ROLE[ev.r].cap || claims.some(c => c.r === ev.r && c.k === ev.k)) rejected.add(ev.id);
+      else claims.push({ id: ev.id, r: ev.r, k: ev.k });
+    } else if (ev.t === "x") {
+      if (typeof ev.id !== "string") continue;
+      tomb.add(ev.id);
+      claims = claims.filter(c => c.id !== ev.id);
+    } else if (ev.t === "s" && Array.isArray(ev.claims)) {
+      claims = [];
+      seen = new Set();
+      tomb = new Set();
+      rejected.clear();
+      for (const c of ev.claims) {
+        if (validClaim(c) && !seen.has(c.id) && countOf(c.r) < ROLE[c.r].cap) {
+          claims.push({ id: c.id, r: c.r, k: c.k });
+          seen.add(c.id);
+        }
+      }
+    }
+  }
+  return { claims, rejected };
+}
+/* ==/REPLAY== */
+
+/* ---------- Hilfen ---------- */
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function randomId(n) {
+  const a = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const b = new Uint8Array(n);
+  crypto.getRandomValues(b);
+  return Array.from(b, x => a[x % a.length]).join("");
+}
+const memory = {};
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return memory[k] || null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { memory[k] = v; } }
+
+const params = new URLSearchParams(location.hash.slice(1));
+const TOPIC = /^[A-Za-z0-9_-]{16,64}$/.test(params.get("k") || "") ? params.get("k") : null;
+const ADMIN = params.get("admin") === "1";
+const base = location.href.split("#")[0];
+
+let events = new Map();
+let claims = [];
+let rejected = new Set();
+let editing = null;
+let filterFree = false;
+let notified = new Set();
+const cards = {};
+
+function myIds() { try { return JSON.parse(lsGet("mine-" + TOPIC) || "[]"); } catch (e) { return []; } }
+function setMyIds(a) { lsSet("mine-" + TOPIC, JSON.stringify(a)); }
+
+function confirmDialog(text, okLabel) {
+  return new Promise(resolve => {
+    const d = $("dlg");
+    $("dlg-text").textContent = text;
+    $("dlg-ok").textContent = okLabel || "OK";
+    const done = v => { d.close(); resolve(v); };
+    $("dlg-ok").onclick = () => done(true);
+    $("dlg-cancel").onclick = () => done(false);
+    d.oncancel = e => { e.preventDefault(); done(false); };
+    d.showModal();
+  });
+}
+function showText(text, intro) {
+  $("copytext").value = text;
+  $("copy-intro").textContent = intro || "Markiere den Text und kopiere ihn.";
+  $("copydlg").showModal();
+}
+$("copyclose").onclick = () => $("copydlg").close();
+async function copy(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (btn) { const t = btn.textContent; btn.textContent = "Kopiert"; setTimeout(() => { btn.textContent = t; }, 1800); }
+  } catch (e) { showText(text); }
+}
+
+let noticeEl = null;
+function notice(text) {
+  if (!noticeEl) return;
+  noticeEl.querySelector("span").textContent = text;
+  noticeEl.hidden = false;
+  noticeEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* ---------- Einrichtung ohne Kanal ---------- */
+function renderSetup() {
+  const app = $("app");
+  app.append(
+    (() => { const h = el("div"); h.append(el("p", "eyebrow", TITLE), el("h1", null, "Aufgaben eintragen")); return h; })()
+  );
+  const c = el("div", "card");
+  c.append(el("h2", null, "Kein Eintragslink geöffnet"));
+  c.append(el("p", "hint", "Schüler:innen öffnen den Link, den ihre Lehrkraft verschickt hat. Er endet auf „#k=…“. Ohne diesen Teil weiß die Seite nicht, wohin sie die Eintragungen schicken soll."));
+  const box = el("div", "card");
+  box.append(el("h3", null, "Neu einrichten (Lehrkraft)"));
+  box.append(el("p", "hint", "Erzeugt einen geheimen Kanal und zwei Links: einen für die Schüler:innen und einen für die Verwaltung."));
+  const b = el("button", "primary", "Neuen Kanal erzeugen");
+  b.type = "button";
+  b.onclick = () => { location.hash = "k=" + randomId(24) + "&admin=1"; location.reload(); };
+  box.append(b);
+  app.append(c, box);
+}
+
+/* ---------- Oberfläche ---------- */
+function build() {
+  const app = $("app");
+  const head = el("header");
+  head.append(el("p", "eyebrow", TITLE), el("h1", null, ADMIN ? "Aufgaben eintragen (Verwaltung)" : "Aufgaben eintragen"));
+  app.append(head);
+
+  noticeEl = el("div", "notice");
+  noticeEl.setAttribute("role", "status");
+  noticeEl.hidden = true;
+  noticeEl.append(el("span"));
+  const nb = el("button", null, "Schließen");
+  nb.type = "button";
+  nb.onclick = () => { noticeEl.hidden = true; };
+  noticeEl.append(nb);
+  app.append(noticeEl);
+
+  const sum = el("div", "card");
+  const r1 = el("div", "row");
+  const cnt = el("div", "count");
+  const fs = el("strong", null, "0"); fs.id = "filled";
+  cnt.append(fs, " von " + TOTAL + " Plätzen besetzt");
+  const st = el("span", "status", "Verbinde …"); st.id = "status";
+  r1.append(cnt, st);
+  const bar = el("div", "bar"); bar.setAttribute("aria-hidden", "true");
+  const bf = el("span"); bf.id = "barfill"; bar.append(bf);
+  sum.append(r1, bar);
+  sum.append(el("p", "hint", "Such dir eine Rolle aus und klicke auf „Eintragen“. Schreibe nur dein Kürzel: erster Buchstabe vom Vornamen, erster Buchstabe vom Nachnamen, zum Beispiel „LK“ für Lena Keller. Bei zwei Vornamen sind es drei Buchstaben. Eine Rolle ist mit der angegebenen Zahl an Personen voll, danach kann sich niemand mehr eintragen."));
+  const tools = el("div", "row");
+  const lab = el("label", "check"); lab.htmlFor = "onlyfree";
+  const cb = el("input"); cb.type = "checkbox"; cb.id = "onlyfree";
+  cb.onchange = () => { filterFree = cb.checked; ROLES.forEach(updateCard); };
+  lab.append(cb, " Nur freie Rollen zeigen");
+  tools.append(lab);
+  sum.append(tools);
+  sum.append(el("p", "hint", "Datenschutz: Übertragen werden nur dein Kürzel und die gewählte Rolle, über den Dienst ntfy.sh."));
+  app.append(sum);
+
+  const mine = el("div", "card mine"); mine.id = "mine"; mine.hidden = true;
+  app.append(mine);
+
+  let lastGroup = null;
+  ROLES.forEach(r => {
+    if (r.group !== lastGroup) { app.append(el("p", "gh", r.group)); lastGroup = r.group; }
+    app.append(buildCard(r));
+  });
+
+  if (ADMIN) app.append(buildAdmin());
+}
+
+function buildCard(r) {
+  const root = el("section", "role");
+  const top = el("div", "role-top");
+  const t = el("div"); t.append(el("h3", null, r.title), el("span", "sub", r.sub));
+  const pill = el("span", "pill free", "");
+  top.append(t, pill);
+  const chips = el("div", "chips");
+  const actions = el("div", "actions");
+  root.append(top, chips, actions);
+  const d = el("details", "more");
+  d.append(el("summary", null, "Mehr zur Aufgabe"));
+  const ul = el("ul"); r.details.forEach(x => ul.append(el("li", null, x))); d.append(ul);
+  root.append(d);
+  cards[r.id] = { root, pill, chips, actions };
+  return root;
+}
+
+function updateCard(r) {
+  const c = cards[r.id];
+  const list = claims.filter(x => x.r === r.id);
+  const full = list.length >= r.cap;
+  const mine = myIds();
+  c.pill.textContent = list.length + " von " + r.cap + (full ? " belegt" : "");
+  c.pill.className = "pill " + (full ? "done" : "free");
+  c.root.classList.toggle("hidden", filterFree && full && editing !== r.id);
+  if (editing === r.id) return;
+  c.chips.textContent = "";
+  list.forEach(x => {
+    const chip = el("span", "chip" + (mine.includes(x.id) ? " me" : ""), x.k);
+    if (ADMIN) {
+      const rm = el("button", null, "×");
+      rm.type = "button";
+      rm.title = "Eintrag " + x.k + " entfernen";
+      rm.setAttribute("aria-label", "Eintrag " + x.k + " entfernen");
+      rm.onclick = () => adminRemove(x);
+      chip.append(rm);
+    }
+    c.chips.append(chip);
+  });
+  c.actions.textContent = "";
+  const b = el("button", full ? null : "primary", full ? "Belegt" : "Eintragen");
+  b.type = "button";
+  b.onclick = () => startEdit(r);
+  c.actions.append(b);
+}
+
+function startEdit(r) {
+  const list = claims.filter(x => x.r === r.id);
+  if (list.length >= r.cap) { notice("Die Rolle „" + r.title + "“ ist bereits belegt. Such dir bitte eine andere Rolle."); return; }
+  if (!ADMIN) {
+    const own = claims.find(x => myIds().includes(x.id));
+    if (own) { notice("Du bist schon bei „" + ROLE[own.r].title + "“ eingetragen (" + own.k + "). Trage dich dort zuerst aus, wenn du wechseln möchtest."); return; }
+  }
+  const prev = editing;
+  editing = r.id;
+  if (prev && prev !== r.id) updateCard(ROLE[prev]);
+  const c = cards[r.id];
+  c.actions.textContent = "";
+  const form = el("form", "edit");
+  const inp = el("input");
+  inp.id = "in-" + r.id;
+  inp.type = "text";
+  inp.maxLength = 3;
+  inp.placeholder = "Kürzel, z. B. LK";
+  inp.autocomplete = "off";
+  inp.setAttribute("autocapitalize", "characters");
+  inp.setAttribute("aria-label", "Kürzel für " + r.title);
+  inp.oninput = () => { inp.value = cleanKuerzel(inp.value); inp.setCustomValidity(""); };
+  const save = el("button", "primary", "Speichern"); save.type = "submit";
+  const cancel = el("button", null, "Abbrechen"); cancel.type = "button";
+  cancel.onclick = () => { editing = null; updateCard(r); };
+  form.append(inp, save, cancel);
+  form.onsubmit = ev => {
+    ev.preventDefault();
+    const k = cleanKuerzel(inp.value);
+    if (k.length < 2) { inp.setCustomValidity("Bitte zwei oder drei Buchstaben eingeben."); inp.reportValidity(); return; }
+    claim(r, k);
+  };
+  c.actions.append(form);
+  setTimeout(() => inp.focus(), 0);
+}
+
+async function claim(r, k) {
+  const list = claims.filter(x => x.r === r.id);
+  if (list.length >= r.cap) { editing = null; updateCard(r); notice("Die Rolle „" + r.title + "“ ist bereits belegt. Such dir bitte eine andere Rolle."); return; }
+  if (list.some(x => x.k === k)) { notice("Das Kürzel " + k + " steht bei dieser Rolle schon. Nimm ein anderes, zum Beispiel mit dem dritten Buchstaben."); return; }
+  const id = randomId(12);
+  const ids = myIds(); ids.push(id); setMyIds(ids);
+  editing = null;
+  try {
+    await send({ t: "c", id, r: r.id, k });
+  } catch (e) {
+    setMyIds(myIds().filter(x => x !== id));
+    updateCard(r);
+    notice("Das Senden hat nicht geklappt. Prüfe das Internet und versuche es noch einmal.");
+  }
+}
+
+async function release(c) {
+  const ok = await confirmDialog("„" + c.k + "“ bei „" + ROLE[c.r].title + "“ austragen?", "Austragen");
+  if (!ok) return;
+  try { await send({ t: "x", id: c.id }); setMyIds(myIds().filter(x => x !== c.id)); }
+  catch (e) { notice("Das Austragen hat nicht geklappt. Versuche es noch einmal."); }
+}
+async function adminRemove(c) { return release(c); }
+
+function renderMine() {
+  const box = $("mine");
+  const ids = myIds();
+  const own = claims.filter(c => ids.includes(c.id));
+  box.hidden = own.length === 0;
+  box.textContent = "";
+  if (!own.length) return;
+  box.append(el("h3", null, ADMIN ? "Von diesem Gerät eingetragen" : "Dein Eintrag"));
+  const ul = el("ul");
+  own.forEach(c => {
+    const li = el("li");
+    li.append(el("strong", null, c.k), " bei " + ROLE[c.r].title + " ");
+    const b = el("button", "link", "Austragen"); b.type = "button"; b.onclick = () => release(c);
+    li.append(b);
+    ul.append(li);
+  });
+  box.append(ul);
+}
+
+function renderAll() {
+  const res = replay(Array.from(events.values()));
+  claims = res.claims;
+  rejected = res.rejected;
+  // Eigene Einträge, die zu spät kamen
+  const ids = myIds();
+  let changed = false;
+  ids.forEach(id => {
+    if (rejected.has(id) && !notified.has(id)) {
+      notified.add(id);
+      changed = true;
+      const ev = Array.from(events.values()).find(m => m.ev && m.ev.id === id && m.ev.t === "c");
+      const rt = ev && ROLE[ev.ev.r] ? ROLE[ev.ev.r].title : "die Rolle";
+      notice("Leider war „" + rt + "“ schon voll, bevor dein Eintrag ankam. Dein Eintrag wurde nicht gespeichert. Such dir bitte eine andere Rolle.");
+    }
+  });
+  if (changed) setMyIds(myIds().filter(id => !rejected.has(id)));
+  ROLES.forEach(updateCard);
+  $("filled").textContent = claims.length;
+  $("barfill").style.width = Math.round(claims.length / TOTAL * 100) + "%";
+  renderMine();
+}
+let renderTimer = null;
+function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(renderAll, 120); }
+
+function setStatus(kind, text) { const s = $("status"); if (s) { s.className = "status " + kind; s.textContent = text; } }
+
+/* ---------- Verwaltung ---------- */
+function listText() {
+  const lines = [TITLE + ", Aufgaben", ""];
+  let g = null;
+  ROLES.forEach(r => {
+    if (r.group !== g) { if (g !== null) lines.push(""); lines.push(r.group); g = r.group; }
+    const k = claims.filter(c => c.r === r.id).map(c => c.k);
+    lines.push("  " + r.title + " (" + k.length + " von " + r.cap + "): " + (k.length ? k.join(", ") : "frei"));
+  });
+  return lines.join("\n");
+}
+function snapshotEvent() { return { t: "s", claims: claims.map(c => ({ id: c.id, r: c.r, k: c.k })) }; }
+
+function buildAdmin() {
+  const box = el("div", "card");
+  box.append(el("h2", null, "Verwaltung"));
+  const studentLink = base + "#k=" + TOPIC;
+  const adminLink = base + "#k=" + TOPIC + "&admin=1";
+
+  const l1 = el("div", "linkbox");
+  l1.append(el("strong", null, "Link für Schüler:innen"));
+  l1.append(el("code", null, studentLink));
+  const c1 = el("button", null, "Link kopieren"); c1.type = "button"; c1.onclick = () => copy(studentLink, c1);
+  l1.append(c1);
+  const l2 = el("div", "linkbox");
+  l2.append(el("strong", null, "Verwaltungslink (nicht weitergeben)"));
+  l2.append(el("code", null, adminLink));
+  const c2 = el("button", null, "Link kopieren"); c2.type = "button"; c2.onclick = () => copy(adminLink, c2);
+  l2.append(c2);
+  box.append(l1, l2);
+  box.append(el("p", "hint", "Der Link funktioniert nur, wenn die Datei im Netz liegt, zum Beispiel bei GitHub Pages. Nach einem Doppelklick auf die lokale Datei sieht die Adresse anders aus und lässt sich nicht an andere schicken."));
+
+  const tools = el("div", "actions");
+  const bCopy = el("button", null, "Liste kopieren"); bCopy.type = "button"; bCopy.onclick = () => copy(listText(), bCopy);
+  const bSave = el("button", null, "Als Datei sichern"); bSave.type = "button";
+  bSave.onclick = () => {
+    const data = JSON.stringify({ v: 1, claims: claims.map(c => ({ r: c.r, k: c.k })) }, null, 1);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    a.download = "turnier-aufgaben-sicherung.json";
+    document.body.append(a); a.click(); a.remove();
+  };
+  const bLoad = el("button", null, "Aus Datei laden"); bLoad.type = "button"; bLoad.onclick = () => $("fileIn").click();
+  const bRefresh = el("button", null, "Stand neu senden"); bRefresh.type = "button";
+  bRefresh.onclick = async () => {
+    try { await send(snapshotEvent()); notice("Der aktuelle Stand wurde neu gesendet."); } catch (e) { notice("Das Senden hat nicht geklappt."); }
+  };
+  const bReset = el("button", "danger", "Alles zurücksetzen"); bReset.type = "button";
+  bReset.onclick = async () => {
+    const ok = await confirmDialog("Wirklich alle Eintragungen löschen? Das gilt für alle Geräte.", "Alles löschen");
+    if (!ok) return;
+    try { await send({ t: "s", claims: [] }); setMyIds([]); } catch (e) { notice("Das Zurücksetzen hat nicht geklappt."); }
+  };
+  tools.append(bCopy, bSave, bLoad, bRefresh, bReset);
+  box.append(tools);
+  box.append(el("p", "hint", "Wichtig: ntfy.sh speichert Nachrichten nur etwa 12 Stunden. Läuft die Eintragung länger, öffne diese Verwaltungsseite regelmäßig. Sie sendet den Stand dann von selbst neu, wenn die ältesten Nachrichten fast abgelaufen sind. Zur Sicherheit kannst du den Stand auch als Datei sichern und später wieder laden."));
+
+  $("fileIn").onchange = async ev => {
+    const f = ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      const list = (j.claims || []).map(c => ({ id: randomId(12), r: c.r, k: cleanKuerzel(c.k) })).filter(validClaim);
+      const ok = await confirmDialog(list.length + " Einträge aus der Datei laden? Der jetzige Stand wird ersetzt.", "Laden");
+      if (!ok) return;
+      await send({ t: "s", claims: list });
+    } catch (e) { notice("Die Datei konnte nicht gelesen werden."); }
+  };
+  return box;
+}
+
+/* ---------- Verbindung zu ntfy ---------- */
+let lastId = null;
+let ctrl = null;
+let openedAt = 0;
+
+async function send(ev) {
+  const res = await fetch(SERVER + "/" + TOPIC, { method: "POST", body: JSON.stringify({ v: 1, ...ev }) });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+}
+
+function handleMsg(m) {
+  if (m.event === "open") { setStatus("ok", "Live verbunden"); openedAt = Date.now(); return; }
+  if (m.event !== "message") return;
+  lastId = m.id;
+  let ev;
+  try { ev = JSON.parse(m.message); } catch (e) { return; }
+  if (!ev || ev.v !== 1) return;
+  events.set(m.id, { id: m.id, time: m.time, ev });
+  scheduleRender();
+}
+
+let autoRefreshDone = false;
+function maybeAutoRefresh() {
+  if (!ADMIN || autoRefreshDone || !events.size) return;
+  const oldest = Math.min(...Array.from(events.values()).map(e => e.time));
+  autoRefreshDone = true;
+  if (Date.now() / 1000 - oldest > 6 * 3600) send(snapshotEvent()).catch(() => {});
+}
+
+async function stream() {
+  ctrl = new AbortController();
+  const res = await fetch(SERVER + "/" + TOPIC + "/json?since=" + (lastId || "all"), { signal: ctrl.signal });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  setTimeout(maybeAutoRefresh, 4000);
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line) continue;
+      try { handleMsg(JSON.parse(line)); } catch (e) { /* Zeile überspringen */ }
+    }
+  }
+}
+
+function waitVisible() {
+  return new Promise(res => {
+    const h = () => { if (!document.hidden) { document.removeEventListener("visibilitychange", h); res(); } };
+    document.addEventListener("visibilitychange", h);
+  });
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden && ctrl) ctrl.abort(); });
+
+async function loop() {
+  let delay = 2000;
+  for (;;) {
+    if (document.hidden) await waitVisible();
+    try {
+      await stream();
+      delay = 2000;
+      await sleep(1000);
+    } catch (e) {
+      if (e && e.name === "AbortError") continue;
+      setStatus("off", "Keine Verbindung. Neuer Versuch …");
+      await sleep(delay);
+      delay = Math.min(delay * 2, 30000);
+    }
+  }
+}
+
+/* ---------- Start ---------- */
+if (!TOPIC) {
+  renderSetup();
+} else {
+  build();
+  renderAll();
+  loop();
+}
+</script>
+</body>
+</html>
